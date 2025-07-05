@@ -112,6 +112,14 @@ defmodule Nostrum.Voice.Event do
 
   defp handle_event(:codec_info, _payload, state), do: state
 
+  defp handle_event(:media_sink_wants, payload, state) do
+    # MEDIA_SINK_WANTS - Undocumented opcode related to media handling
+    Logger.debug("MEDIA_SINK_WANTS (opcode 15): #{inspect(payload)}")
+    # Appears to be related to media quality/bitrate preferences
+    # The "any": 100 might indicate quality percentage or priority
+    state
+  end
+
   defp handle_event(:speaking, payload, state) do
     ssrc = payload["d"]["ssrc"]
     user_id = payload["d"]["user_id"] |> String.to_integer()
@@ -183,6 +191,35 @@ defmodule Nostrum.Voice.Event do
   defp handle_event(:dave_mls_invalid_commit_welcome, payload, state) do
     Logger.debug("DAVE MLS INVALID COMMIT WELCOME: #{inspect(payload)}")
     # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:clients_connect, payload, state) do
+    # CLIENTS_CONNECT - One or more clients have connected to the voice channel
+    Logger.info("CLIENTS_CONNECT (opcode 11): #{inspect(payload)}")
+    # This event indicates users joining the voice channel
+    # Important for tracking when to play join sounds
+    state
+  end
+
+  defp handle_event(:flags, payload, state) do
+    # FLAGS - Per-user voice flags/permissions
+    Logger.debug("VOICE FLAGS (opcode 18): #{inspect(payload)}")
+    # Contains user_id and voice-related permission flags
+    # Not critical for soundboard functionality but good to log
+    state
+  end
+
+  defp handle_event(:platform, payload, state) do
+    # PLATFORM - User platform information
+    Logger.debug("PLATFORM (opcode 20): #{inspect(payload)}")
+    # Contains user_id and platform (0 = desktop, 1 = mobile, etc.)
+    state
+  end
+
+  defp handle_event(:unknown, payload, state) do
+    Logger.debug("VOICE EVENT UNKNOWN: #{inspect(payload)}")
+    # Unknown voice event
     state
   end
 

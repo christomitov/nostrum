@@ -135,6 +135,12 @@ defmodule Nostrum.Voice.Session do
     end
   end
 
+  def handle_info({:gun_ws, _worker, _stream, {:binary, _data}}, state) do
+    # Binary frames are used for voice data packets, not control messages
+    # We can safely ignore these in the session handler as they're handled elsewhere
+    {:noreply, state}
+  end
+
   def handle_info({:gun_ws, _conn, _stream, :close}, state) do
     Logger.info("Voice websocket closed (unknown reason)")
     {:noreply, state}
