@@ -52,12 +52,34 @@ defmodule Nostrum.Voice.Session do
 
     [host, port] = String.split(voice.gateway, ":")
 
-    gun_opts = %{protocols: [:http], retry: 1_000_000_000, tls_opts: Constants.gun_tls_opts()}
+    gun_opts = %{
+      transport: :tls,
+      protocols: [:http], 
+      retry: 1_000_000_000, 
+      tls_opts: Constants.gun_tls_opts()
+    }
     {:ok, worker} = :gun.open(:binary.bin_to_list(host), String.to_integer(port), gun_opts)
 
-    {:ok, :http} = :gun.await_up(worker, @timeout_connect)
+    {:ok, _protocol} = :gun.await_up(worker, @timeout_connect)
     stream = :gun.ws_upgrade(worker, @gateway_qs)
-    {:upgrade, ["websocket"], _} = :gun.await(worker, stream, @timeout_ws_upgrade)
+    
+    case :gun.await(worker, stream, @timeout_ws_upgrade) do
+      {:upgrade, ["websocket"], _} ->
+        # Success - continue normal flow
+        :ok
+        
+      {:response, :nofin, 400, headers} ->
+        Logger.warning("HTTP 400 error during voice websocket upgrade: #{inspect(headers)}")
+        {:stop, {:shutdown, :http_400_error}, nil}
+        
+      {:response, :nofin, status_code, headers} ->
+        Logger.warning("HTTP #{status_code} error during voice websocket upgrade: #{inspect(headers)}")
+        {:stop, {:shutdown, {:http_error, status_code}}, nil}
+        
+      unexpected ->
+        Logger.warning("Unexpected response during voice websocket upgrade: #{inspect(unexpected)}")
+        {:stop, {:shutdown, :unexpected_response}, nil}
+    end
 
     state = %VoiceWSState{
       conn_pid: self(),
@@ -129,6 +151,17 @@ defmodule Nostrum.Voice.Session do
     end
   end
 
+  # Handle HTTP error responses after failed websocket upgrade
+  def handle_info({:gun_data, _conn, _stream, :fin, data}, state) do
+    Logger.warning("Received HTTP error response after failed voice websocket upgrade: #{inspect(data)}")
+    {:stop, {:shutdown, :http_error_response}, state}
+  end
+
+  def handle_info({:gun_data, _conn, _stream, :nofin, data}, state) do
+    Logger.warning("Received partial HTTP error response after failed voice websocket upgrade: #{inspect(data)}")
+    {:noreply, state}
+  end
+
   def handle_info(
         {:gun_down, _conn, _proto, _reason, _killed_streams},
         state
@@ -141,9 +174,20 @@ defmodule Nostrum.Voice.Session do
 
   def handle_info({:gun_up, worker, _proto}, state) do
     stream = :gun.ws_upgrade(worker, @gateway_qs)
-    {:upgrade, ["websocket"], _} = :gun.await(worker, stream, @timeout_ws_upgrade)
-    Logger.warning("Reconnected after connection broke")
-    {:noreply, %{state | heartbeat_ack: true}}
+    
+    case :gun.await(worker, stream, @timeout_ws_upgrade) do
+      {:upgrade, ["websocket"], _} ->
+        Logger.warning("Reconnected after connection broke")
+        {:noreply, %{state | heartbeat_ack: true}}
+        
+      {:response, :nofin, 400, headers} ->
+        Logger.warning("HTTP 400 error during voice websocket reconnection: #{inspect(headers)}")
+        {:stop, {:shutdown, :http_400_error}, state}
+        
+      unexpected ->
+        Logger.warning("Unexpected response during voice websocket reconnection: #{inspect(unexpected)}")
+        {:stop, {:shutdown, :unexpected_response}, state}
+    end
   end
 
   def handle_info({:udp, _erl_port, _ip, _port, packet}, state) do
@@ -223,6 +267,37 @@ defmodule Nostrum.Voice.Session do
 
   def terminate({:shutdown, :close}, state) do
     :gun.close(state.conn)
+  end
+  
+  # Added specific terminate handlers for HTTP errors
+  def terminate({:shutdown, :http_400_error}, state) do
+    Logger.info("Voice session terminated due to HTTP 400 error from Discord")
+    if state && state.conn, do: :gun.close(state.conn)
+  end
+
+  def terminate({:shutdown, {:http_error, status_code}}, state) do
+    Logger.info("Voice session terminated due to HTTP #{status_code} error from Discord")
+    if state && state.conn, do: :gun.close(state.conn)
+  end
+
+  def terminate({:shutdown, :unexpected_response}, state) do
+    Logger.info("Voice session terminated due to unexpected response from Discord")
+    if state && state.conn, do: :gun.close(state.conn)
+  end
+
+  def terminate({:shutdown, :http_error_response}, state) do
+    Logger.info("Voice session terminated due to HTTP error response from Discord")
+    if state && state.conn, do: :gun.close(state.conn)
+  end
+
+  # Catch-all for other unexpected termination reasons
+  def terminate(reason, state) do
+    Logger.warning("Voice session terminating with unexpected reason: #{inspect(reason)}")
+    try do
+      if state && state.conn, do: :gun.close(state.conn)
+    rescue
+      e -> Logger.debug("Error closing connection during cleanup: #{inspect(e)}")
+    end
   end
 
   def code_change(_old_vsn, state, _extra) do

@@ -119,6 +119,73 @@ defmodule Nostrum.Voice.Event do
     %{state | ssrc_map: ssrc_map}
   end
 
+  # DAVE Protocol event handlers
+  defp handle_event(:dave_protocol_prepare_transition, payload, state) do
+    Logger.debug("DAVE PROTOCOL PREPARE TRANSITION: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_protocol_execute_transition, payload, state) do
+    Logger.debug("DAVE PROTOCOL EXECUTE TRANSITION: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_protocol_ready_for_transition, payload, state) do
+    Logger.debug("DAVE PROTOCOL READY FOR TRANSITION: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_protocol_prepare_epoch, payload, state) do
+    Logger.debug("DAVE PROTOCOL PREPARE EPOCH: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_mls_external_sender_package, payload, state) do
+    Logger.debug("DAVE MLS EXTERNAL SENDER PACKAGE: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_mls_key_package, payload, state) do
+    Logger.debug("DAVE MLS KEY PACKAGE: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_mls_proposals, payload, state) do
+    Logger.debug("DAVE MLS PROPOSALS: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_mls_commit_welcome, payload, state) do
+    Logger.debug("DAVE MLS COMMIT WELCOME: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_mls_announce_commit_transition, payload, state) do
+    Logger.debug("DAVE MLS ANNOUNCE COMMIT TRANSITION: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_mls_welcome, payload, state) do
+    Logger.debug("DAVE MLS WELCOME: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
+  defp handle_event(:dave_mls_invalid_commit_welcome, payload, state) do
+    Logger.debug("DAVE MLS INVALID COMMIT WELCOME: #{inspect(payload)}")
+    # For now, just acknowledge the event - full DAVE implementation would go here
+    state
+  end
+
   defp handle_event(event, _payload, state) do
     Logger.debug("UNHANDLED VOICE GATEWAY EVENT #{event}")
     state
